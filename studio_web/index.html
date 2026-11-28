@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>VoidFeed Studio</title>
+<style>html,body{background:var(--bg);color:var(--fg)}</style>
+<script>
+/* Theme boot — runs before first paint to avoid flash */
+(function(){
+  try {
+    var t = localStorage.getItem("vf_theme");
+    if (t !== "light" && t !== "dark") t = "dark";
+    document.documentElement.dataset.theme = t;
+  } catch(e){ document.documentElement.dataset.theme = "dark"; }
+})();
+</script>
+<script>
+window.__bootlog = [];
+window.addEventListener('error', function(e){
+  var b = document.getElementById('boot-status');
+  if (b) { b.style.display = 'block'; b.textContent = 'Script error: ' + (e.message || e.type) + ' @ ' + (e.filename||'').split('/').pop() + ':' + e.lineno; }
+  window.__bootlog.push(String(e.message || e.type));
+});
+</script>
+<script src="/telegram-web-app.js"></script>
+<link rel="stylesheet" href="/app.css?v=20261127-statusneutral">
+</head>
+<body>
+<!-- ===== Startup Splash ===== -->
+<div id="splash">
+  <div class="splash-inner">
+    <div class="splash-ring">
+      <img src="/static-assets/wormhole.jpeg" alt="VoidFeed" class="splash-logo">
+    </div>
+    <div class="splash-title">VoidFeed</div>
+    <div class="splash-sub">خوراکِ خلأ</div>
+    <div class="splash-bar"><span></span></div>
+  </div>
+</div>
+
+<div id="boot-status" style="display:none;background:#3a2a12;color:#ffd9a0;padding:8px 12px;font-size:12px;border-radius:8px;margin:8px 14px;z-index:100;position:relative">در حال بارگذاری استودیو…</div>
+<div id="app">
+
+  <!-- ===== Topbar ===== -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🌌</span>
+      <div>
+        <div class="brand-name">VoidFeed Studio</div>
+        <div class="brand-sub" id="user-name">…</div>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="btn-menu" title="Menu" aria-label="Menu"><svg class="uiic" width="20" height="20" aria-hidden="true"><use href="#ui-menu"/></svg></button>
+      <button class="lang-btn" id="btn-lang" aria-label="Language">EN</button>
+      <button class="circle-btn" id="btn-theme" aria-label="Switch to light" title="Theme"><svg class="uiic" width="17" height="17" aria-hidden="true"><use id="theme-use" href="#ui-sun"/></svg></button>
+      <button class="circle-btn" id="btn-refresh" title="Refresh" aria-label="Refresh"><svg class="uiic" width="17" height="17" aria-hidden="true"><use href="#ui-refresh"/></svg></button>
+    </div>
+  </header>
+
+  <!-- ===== Pages ===== -->
+  <main id="pages">
+
+    <!-- ---- Home ---- -->
+    <section class="page active" id="page-home">
+      <div class="stats" id="stats"></div>
+      <div class="card">
+        <div class="card-title"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-schedule"/></svg><span data-i18n="plan">برنامهٔ انتشار</span></div>
+        <div class="cal-head">
+          <button class="icon-btn" id="cal-prev">‹</button>
+          <div id="cal-title">—</div>
+          <button class="icon-btn" id="cal-next">›</button>
+        </div>
+        <div class="cal-grid cal-days-head" id="cal-weekdays"></div>
+        <div class="cal-grid" id="cal-grid"></div>
+      </div>
+      <div class="card" id="day-list-card" style="display:none">
+        <div class="card-title" id="day-list-title"></div>
+        <div id="day-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" data-i18n="recent">آخرین پست‌ها</div>
+        <div id="home-recent"></div>
+      </div>
+    </section>
+
+    <!-- ---- Channels ---- -->
+    <section class="page" id="page-connections">
+      <div class="card">
+        <div class="card-title" data-i18n="conn_title2">اتصال‌ها</div>
+        <div class="hint" data-i18n="conn_hint2">«حضور اجتماعی» یعنی یک صفحه عمومی از VoidFeed روی آن پلتفرم؛ «اتصال فنی» یعنی یک مجوز واقعی برای انجام عملیات API. این دو متفاوت‌اند. در این نسخه هیچ اتصال OAuth واقعی فعال نیست.</div>
+        <div id="conn-list"></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-channels">
+      <div class="card">
+        <div class="card-title"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-messages"/></svg><span data-i18n="my_chats">چت‌های ثبت‌شده</span></div>
+        <div class="hint" data-i18n="auto_reg">چت‌هایی که بات در آن‌ها ادمین است خودکار ثبت می‌شوند؛ برای ثبت فوری در گروه، /syncchat را همان‌جا بفرست.</div>
+      </div>
+      <div class="card">
+        <div id="ch-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" data-i18n="add_channel">افزودن دستی کانال جدید</div>
+        <div class="row">
+          <input id="ch-input" type="text" data-i18n-ph="ch_ph" placeholder="@username یا لینک">
+          <button class="btn primary" id="ch-add" data-i18n="add">افزودن</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---- Posts ---- -->
+    <section class="page" id="page-posts">
+      <div class="chips" id="post-filters">
+        <button class="chip active" data-f="" data-i18n="f_all">همه</button>
+        <button class="chip" data-f="draft" data-i18n="f_draft">پیش‌نویس</button>
+        <button class="chip" data-f="approved" data-i18n="f_approved">تأییدشده</button>
+        <button class="chip" data-f="scheduled" data-i18n="f_scheduled">زمان‌بندی</button>
+        <button class="chip" data-f="published" data-i18n="f_published">منتشرشده</button>
+        <button class="chip" data-f="publish_failed" data-i18n="f_failed">ناموفق</button>
+        <button class="chip" data-f="rejected" data-i18n="f_rejected">ردشده</button>
+      </div>
+      <div id="post-list"></div>
+    </section>
+
+    <!-- ---- Profile ---- -->
+    <section class="page" id="page-schedule">
+      <div class="card">
+        <div class="card-title"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-schedule"/></svg><span data-i18n="sched_title">زمان‌بندی انتشار</span></div>
+        <div class="hint" data-i18n="sched_hint">پست‌های زمان‌بندی‌شده اینجا مدیریت می‌شوند؛ بات در زمان مقرر منتشر می‌کند.</div>
+        <div id="schedule-list"></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-history">
+      <div class="card">
+        <div class="card-title"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-history"/></svg><span data-i18n="hist_title">تاریخچه انتشار</span></div>
+        <div class="hint" data-i18n="hist_hint">ثبت رویدادهای انتشار/زمان‌بندی</div>
+        <div class="chips" id="hist-filters">
+          <button class="chip active" data-h=""><span data-i18n="hist_all">همه</span></button>
+          <button class="chip" data-h="scheduled"><span data-i18n="hist_scheduled">زمان‌بندی</span></button>
+          <button class="chip" data-h="published"><span data-i18n="hist_published">منتشرشده</span></button>
+          <button class="chip" data-h="failed"><span data-i18n="hist_failed">ناموفق</span></button>
+          <button class="chip" data-h="unscheduled"><span data-i18n="hist_unscheduled">لغو</span></button>
+        </div>
+        <div id="history-list"></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-profile">
+      <div class="card brand-card">
+        <div class="brand-head">
+          <img class="brand-logo" src="/static-assets/wormhole.jpeg" alt="VoidFeed">
+          <div class="brand-id">
+            <div class="brand-name" id="brand-name"></div>
+            <div class="brand-slogan" id="brand-slogan-fa"></div>
+            <div class="brand-slogan en" id="brand-slogan-en"></div>
+            <div class="brand-email" id="brand-email"></div>
+          </div>
+        </div>
+        <label class="field-label" data-i18n="prof_desc_fa">معرفی برند (فارسی)</label>
+        <textarea id="prof-desc-fa" rows="4"></textarea>
+        <label class="field-label" data-i18n="prof_desc_en">Brand intro (English)</label>
+        <textarea id="prof-desc-en" rows="4"></textarea>
+        <div class="row"><button class="btn primary" id="prof-save" data-i18n="save">ذخیره</button><span id="prof-save-msg" class="hint"></span></div>
+        <div class="brand-sub" data-i18n="prof_social_title">حضور اجتماعی</div>
+        <div class="hint" data-i18n="prof_social_hint">لینک‌های عمومی پروفایل؛ تیک = لینک تأییدشده. اگر لینک دقیقی تأیید نشده باشد، فقط نام نمایش داده می‌شود.</div>
+        <div id="social-grid" class="social-grid"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-posts"/></svg><span data-i18n="news_title">اخبار خودکار</span></div>
+        <div class="hint" id="news-status">—</div>
+        <label class="switch-row"><span data-i18n="news_enable">دریافت و انتشار خودکار خبر</span><input type="checkbox" id="news-enabled"></label>
+        <label class="switch-row"><span data-i18n="news_auto">انتشار مستقیم در کانال پیش‌فرض</span><input type="checkbox" id="news-auto"></label>
+        <div class="row">
+          <input id="news-interval" type="number" min="10" max="240" data-i18n-ph="news_interval_ph" placeholder="بازه (دقیقه)">
+          <button class="btn primary" id="news-save" data-i18n="save">ذخیره</button>
+        </div>
+        <button class="btn ghost" id="news-now"><svg class="uiic" width="16" height="16" aria-hidden="true"><use href="#ui-download"/></svg><span data-i18n="news_now">واکشی و انتشار فوری یک خبر</span></button>
+      </div>
+      <div class="card">
+        <div class="card-title"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-penLine"/></svg><span data-i18n="signature">امضای پایین پست</span></div>
+        <label class="switch-row"><span data-i18n="sig_enable">افزودن امضا هنگام انتشار</span><input type="checkbox" id="sig-enabled"></label>
+        <input id="sig-text" type="text" placeholder="🌌 @FeedTheVoids">
+        <button class="btn primary" id="sig-save" data-i18n="save">ذخیره</button>
+      </div>
+      <div class="card">
+        <div class="card-title"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-sparkles"/></svg><span data-i18n="ai_title">هوش مصنوعی</span></div>
+        <div id="ai-status" class="hint">—</div>
+        <div id="ai-test-result" class="hint" style="margin-top:6px"></div>
+        <button class="btn ghost" id="ai-test-btn" data-i18n="ai_test" style="margin-top:8px">آزمایش اتصال</button>
+      </div>
+      <div class="card">
+        <div class="card-title" data-i18n="about">درباره</div>
+        <div class="hint" data-i18n="about_text">VoidFeed Studio v3 — تولید محتوا برای تلگرام و شبکه‌های اجتماعی؛ همه‌چیز روی سرور خودت.</div>
+        <button class="btn ghost" id="profile-logout" data-i18n="logout" style="display:none">خروج و حذف توکن دسترسی</button>
+      </div>
+    </section>
+
+    <!-- ---- Moderation ---- -->
+    <section class="page" id="page-mod">
+      <div class="card">
+        <div class="card-title"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-messages"/></svg><span data-i18n="mod_title">مدیریت محتوا</span></div>
+        <div class="hint" data-i18n="mod_hint">کلمات ممنوعه هنگام دریافت پیام بررسی می‌شوند؛ با «بازدارنده» (Regex) می‌توانید الگو بسازید.</div>
+        <div id="mod-words"></div>
+        <div class="row mod-add-row">
+          <select id="mod-cat"></select>
+          <input id="mod-term" type="text" data-i18n-ph="mod_term_ph" placeholder="کلمه / الگو">
+          <label class="switch-row"><span data-i18n="mod_regex">Regex</span><input type="checkbox" id="mod-regex"></label>
+          <button class="btn primary" id="mod-add" data-i18n="mod_add_word">افزودن</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title" data-i18n="mod_chats">گفتگوهای تحت نظارت</div>
+        <div id="mod-chats"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" data-i18n="mod_log">لاگ بازداشت</div>
+        <div id="mod-log"></div>
+      </div>
+      <div class="card">
+        <div class="card-title" data-i18n="mod_banned">کاربران مسدود</div>
+        <div id="mod-banned"></div>
+      </div>
+    </section>
+
+    <!-- ---- Statistics ---- -->
+    <section class="page" id="page-stats">
+      <div class="card">
+        <div class="card-title"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-schedule"/></svg><span data-i18n="stats_title">آمار استودیو</span></div>
+        <div class="hint" data-i18n="stats_hint">همه عددها از داده واقعی سرور خوانده می‌شوند؛ اگر سرویسی در دسترس نباشد، جای آن «ناموجود» نشان داده می‌شود.</div>
+        <div class="stats" id="stats-overview"></div>
+        <div id="stats-more"></div>
+      </div>
+    </section>
+
+    <!-- ---- News admin ---- -->
+    <section class="page" id="page-news">
+      <div class="card">
+        <div class="card-title"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-download"/></svg><span data-i18n="news_admin_title">اخبار خودکار</span></div>
+        <div class="hint" id="na-meta">—</div>
+        <label class="switch-row"><span data-i18n="news_enable">دریافت و انتشار خودکار خبر</span><input type="checkbox" id="na-enabled"></label>
+        <label class="switch-row"><span data-i18n="news_auto">انتشار مستقیم در کانال پیش‌فرض</span><input type="checkbox" id="na-auto"></label>
+        <div class="row">
+          <input id="na-interval" type="number" min="10" max="240" data-i18n-ph="news_interval_ph" placeholder="بازه (دقیقه)">
+          <button class="btn primary" id="na-save" data-i18n="save">ذخیره</button>
+        </div>
+        <button class="btn ghost" id="na-fetch" style="margin-top:8px"><svg class="uiic" width="16" height="16" aria-hidden="true"><use href="#ui-download"/></svg><span data-i18n="news_now">واکشی و انتشار فوری یک خبر</span></button>
+      </div>
+      <div class="card">
+        <div class="card-title" data-i18n="src_title">منابع خبر</div>
+        <div class="hint" data-i18n="src_hint">فقط آدرس‌های http(s) پذیرفته می‌شوند؛ نام و دسته برای هر منبع الزامی است.</div>
+        <div id="na-sources"></div>
+        <div class="row mod-add-row">
+          <input id="na-name" type="text" data-i18n-ph="src_name_ph" placeholder="نام منبع">
+          <input id="na-url" type="text" data-i18n-ph="src_url_ph" placeholder="آدرس خوراک">
+          <input id="na-cat" type="text" data-i18n-ph="src_cat_ph" placeholder="دسته">
+          <button class="btn ghost" id="na-add" data-i18n="src_add">افزودن</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== FAB ===== -->
+  <button class="fab" id="fab-create" data-i18n="new_post">＋ پست جدید</button>
+
+  <!-- ===== Bottom nav ===== -->
+  <nav class="bottom-nav">
+    <button class="tab active" data-page="home"><span><svg class="uiic" width="20" height="20" aria-hidden="true"><use href="#ui-home"/></svg></span><em data-i18n="tab_home">خانه</em></button>
+    <button class="tab" data-page="channels"><span><svg class="uiic" width="20" height="20" aria-hidden="true"><use href="#ui-messages"/></svg></span><em data-i18n="tab_chats">چت‌ها</em></button>
+    <button class="tab" data-page="connections"><span><svg class="uiic" width="20" height="20" aria-hidden="true"><use href="#ui-cable"/></svg></span><em data-i18n="tab_connections">اتصال‌ها</em></button>
+    <button class="tab" data-page="posts"><span><svg class="uiic" width="20" height="20" aria-hidden="true"><use href="#ui-posts"/></svg></span><em data-i18n="tab_posts">پست‌ها</em></button>
+    <button class="tab" data-page="schedule"><span><svg class="uiic" width="20" height="20" aria-hidden="true"><use href="#ui-schedule"/></svg></span><em data-i18n="tab_schedule">برنامه</em></button>
+    <button class="tab" data-page="history"><span><svg class="uiic" width="20" height="20" aria-hidden="true"><use href="#ui-history"/></svg></span><em data-i18n="tab_history">تاریخچه</em></button>
+    <button class="tab" data-page="profile"><span><svg class="uiic" width="20" height="20" aria-hidden="true"><use href="#ui-profile"/></svg></span><em data-i18n="tab_profile">پروفایل</em></button>
+  </nav>
+
+  <!-- ===== Editor sheet ===== -->
+  <div class="sheet-backdrop" id="editor-backdrop">
+    <div class="sheet" id="editor-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title" id="editor-title"></div>
+
+      <textarea id="ed-text" data-i18n-ph="post_text_ph" placeholder="متن پست…"></textarea>
+      <div class="char-count" id="ed-count"></div>
+
+      <div class="ai-panel">
+        <div class="ai-row">
+          <input id="ai-topic" type="text" data-i18n-ph="ai_topic_ph" placeholder="موضوع پست برای هوش مصنوعی…">
+          <button class="btn ai" id="ai-gen"><svg class="uiic" width="16" height="16" aria-hidden="true"><use href="#ui-sparkles"/></svg><span data-i18n="ai_gen">تولید</span></button>
+        </div>
+        <div class="ai-row">
+          <select id="ai-tone">
+            <option value="friendly" data-i18n="tone_friendly">لحن: صمیمی</option>
+            <option value="formal" data-i18n="tone_formal">رسمی</option>
+            <option value="funny" data-i18n="tone_funny">طنز</option>
+            <option value="promo" data-i18n="tone_promo">تبلیغاتی</option>
+            <option value="news" data-i18n="tone_news">خبری</option>
+          </select>
+          <select id="ai-length">
+            <option value="short" data-i18n="len_short">کوتاه</option>
+            <option value="medium" selected data-i18n="len_medium">متوسط</option>
+            <option value="long" data-i18n="len_long">بلند</option>
+          </select>
+        </div>
+        <div class="ai-row">
+          <button class="btn ghost" data-rewrite="improve" data-i18n="rw_improve">بازنویسی</button>
+          <button class="btn ghost" data-rewrite="shorten" data-i18n="rw_shorten">کوتاه‌تر</button>
+          <button class="btn ghost" data-rewrite="emoji" data-i18n="rw_emoji">ایموجی‌دار</button>
+        </div>
+        <div class="ai-row">
+          <select id="ai-format-net"></select>
+          <button class="btn ghost" id="ai-format"><svg class="uiic" width="16" height="16" aria-hidden="true"><use href="#ui-sparkles"/></svg><span data-i18n="ai_format">قالب‌بندی (AI)</span></button>
+        </div>
+      </div>
+
+      <div class="net-block">
+        <div class="net-title"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-target"/></svg><span data-i18n="networks">شبکه‌های هدف</span></div>
+        <div class="net-chips" id="net-chips"></div>
+        <div id="net-variants"></div>
+      </div>
+
+      <div class="ed-media" id="ed-media"></div>
+      <div class="ed-media-actions">
+        <label class="btn ghost file-btn"><svg class="uiic" width="16" height="16" aria-hidden="true"><use href="#ui-paperclip"/></svg><span data-i18n="attach">تصویر / ویدیو</span><input type="file" id="ed-file" accept=".jpg,.jpeg,.png,.webp,.mp4,.mov,.webm" hidden></label>
+        <button class="btn ghost" id="btn-library"><svg class="uiic" width="16" height="16" aria-hidden="true"><use href="#ui-images"/></svg><span data-i18n="lib_open">کتابخانه</span></button>
+        <button class="btn ghost" id="btn-templates"><svg class="uiic" width="16" height="16" aria-hidden="true"><use href="#ui-layoutTemplate"/></svg><span data-i18n="tpl_open">قالب‌ها</span></button>
+      </div>
+
+      <div class="net-block">
+        <div class="net-title"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-media"/></svg><span data-i18n="mgen">تولید تصویر/ویدیو برنددار</span></div>
+        <div class="ai-row">
+          <select id="mgen-platform"></select>
+          <select id="mgen-kind">
+            <option value="photo" data-i18n="mgen_photo">تصویر</option>
+            <option value="video" data-i18n="mgen_video">ویدیو</option>
+          </select>
+        </div>
+        <div class="ai-row" id="mgen-sec-row" style="display:none">
+          <label class="hint" data-i18n="mgen_sec">طول ویدیو (ثانیه)</label>
+          <input id="mgen-seconds" type="number" min="3" max="30" value="8">
+        </div>
+        <button class="btn ai" id="mgen-go"><svg class="uiic" width="16" height="16" aria-hidden="true"><use href="#ui-media"/></svg><span data-i18n="mgen_go">ساخت از متن پست</span></button>
+        <div class="hint" id="mgen-info"></div>
+      </div>
+
+      <div class="row">
+        <select id="ed-channel"></select>
+        <button class="btn ghost" id="ed-sched-toggle">⏰ <span data-i18n="schedule">زمان‌بندی</span></button>
+      </div>
+      <input type="datetime-local" id="ed-sched" style="display:none">
+
+      <div class="sheet-actions">
+        <button class="btn ghost" id="ed-close" data-i18n="close">بستن</button>
+        <button class="btn ghost" id="ed-preview"><svg class="uiic" width="16" height="16" aria-hidden="true"><use href="#ui-eye"/></svg><span data-i18n="preview">پیش‌نمایش</span></button>
+        <button class="btn ghost" id="ed-save" data-i18n="save_draft">ذخیره</button>
+        <button class="btn primary" id="ed-publish" data-i18n="publish_now">انتشار فوری</button>
+      </div>
+      <div class="msg" id="ed-msg"></div>
+    </div>
+  </div>
+
+  <!-- ===== Preview modal ===== -->
+  <div class="sheet-backdrop" id="preview-backdrop">
+    <div class="sheet preview-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-eye"/></svg><span data-i18n="preview_title">پیش‌نمایش پست</span></div>
+      <div class="tg-mock" id="tg-mock"></div>
+      <div class="preview-net-row">
+        <div class="net-chips" id="preview-net-chips"></div>
+      </div>
+      <div class="preview-meta-row">
+        <span class="preview-count" id="preview-count"></span>
+        <button class="btn ghost" id="preview-copy" data-i18n="copy">کپی</button>
+      </div>
+      <div class="hint" id="preview-note"></div>
+      <div class="sheet-actions">
+        <button class="btn primary" id="preview-close" data-i18n="close">بستن</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-backdrop" id="library-backdrop">
+    <div class="sheet lib-sheet">
+      <div class="sheet-title"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-images"/></svg><span data-i18n="lib_title">کتابخانه رسانه</span></div>
+      <div id="lib-list"></div>
+    </div>
+  </div>
+
+  <div class="sheet-backdrop" id="templates-backdrop">
+    <div class="sheet tpl-sheet">
+      <div class="sheet-title"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-layoutTemplate"/></svg><span data-i18n="tpl_title">قالب‌های پست</span></div>
+      <div class="tpl-new">
+        <input id="tpl-name" type="text" data-i18n-ph="tpl_name_ph" placeholder="نام قالب">
+        <textarea id="tpl-body" data-i18n-ph="tpl_body_ph" placeholder="متن قالب"></textarea>
+        <button class="btn primary" id="tpl-create" data-i18n="tpl_create">افزودن قالب</button>
+      </div>
+      <div id="tpl-list"></div>
+    </div>
+  </div>
+
+  <div class="drawer-backdrop" id="drawer-backdrop">
+    <div class="drawer" id="drawer">
+      <div class="drawer-head"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-menu"/></svg><span data-i18n="dr_head">منو</span></div>
+      <div class="drawer-item" data-act="create"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-squarePen"/></svg><span data-i18n="dr_create">ایجاد پست</span></div>
+      <div class="drawer-item" data-act="cancel"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-cancel"/></svg><span data-i18n="dr_cancel">لغو</span></div>
+      <div class="drawer-item" data-act="posts"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-folder"/></svg><span data-i18n="dr_posts">پست‌های من</span></div>
+      <div class="drawer-item" data-act="profile"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-profile"/></svg><span data-i18n="dr_profile">پروفایل</span></div>
+      <div class="drawer-item" data-act="mod"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-messages"/></svg><span data-i18n="dr_mod">مدیریت محتوا</span></div>
+      <div class="drawer-item" data-act="stats"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-schedule"/></svg><span data-i18n="dr_stats">آمار</span></div>
+      <div class="drawer-item" data-act="news"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-download"/></svg><span data-i18n="dr_news">اخبار خودکار</span></div>
+      <div class="drawer-item" data-act="lang"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-languages"/></svg><span data-i18n="dr_lang">تغییر زبان</span></div>
+      <div class="drawer-item" data-act="back"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-back"/></svg><span data-i18n="dr_back">بازگشت</span></div>
+      <label class="drawer-switch"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-link"/></svg><span data-i18n="dr_linkpreview">پیش‌نمایش لینک</span><input type="checkbox" id="dr-linkprev"></label>
+      <label class="drawer-switch"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-save"/></svg><span data-i18n="dr_autofwd">ذخیره خودکار فوروارد</span><input type="checkbox" id="dr-autofwd"></label>
+      <div class="drawer-item" data-act="help"><svg class="uiic" width="18" height="18" aria-hidden="true"><use href="#ui-help"/></svg><span data-i18n="dr_help">راهنما</span></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+<script src="/app.js?v=20261127-statusneutral"></script>
+</body>
+</html>

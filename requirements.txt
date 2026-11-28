@@ -1,0 +1,11 @@
+python-telegram-bot==22.8
+python-dotenv==1.2.4
+httpx==0.28.1
+feedparser==6.0.14
+fastapi==0.162.4
+uvicorn==0.54.0
+Pillow==13.0.0
+python-multipart==0.0.33
+arabic-reshaper==3.1.0
+python-bidi==0.6.12
+cryptography==50.0.2
